@@ -31,7 +31,7 @@ ggplot(proto.table, aes(x=Var1, y=Freq)) +
 uniq.mail <- unique(mail.dataset.with.proto$Login)%>%
   length() %>%
   print()
-#----  кол-во подключений ----
+#----  кол-во подключений ------
 
 
 
