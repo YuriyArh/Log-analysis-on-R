@@ -11,6 +11,7 @@ library(tidyr)
 library(dplyr)
 library(stringr)
 library(ggplot2)
+library(lubridate)
 ######################### Functions() ###############################
 
 #------------ find_multiply_ip_for_login(login, d_frame)---------------
@@ -71,8 +72,50 @@ find_multiply_ip_for_login <- function(login, d_frame) {
     user_connection_table_ip_temp <- filter(user_connection_table, Login == as.character(mult_logins_user$e_mail[i] ))
     user_connection_table_ip <- rbind( user_connection_table_ip, user_connection_table_ip_temp)
   }
+  # work with date 
+  # convert  user_connection_table_ip$Date to POSIXlt format
   
+  user_connection_table_ip$Date <- as.character(user_connection_table_ip$Date) %>%
+      strptime(format = '%Y %b %d %H:%M:%S', 'GMT') 
+  #-----------------------------------------------------------------------
+  # fix the time window and move it along the frame user_connection_table_ip 
+  # inside each step we will check the connection from at least 
+  # three unique ip-addresses, if the conditions are met, 
+  # we display the rows in the summary table  user_connection_table_final
+  #-----------------------------------------------------------------------
+  user_connection_table_final <- data.frame()
+  #W <- length(user_connection_table_ip$Date)
+  W = 10
+  for (i in 1:(W-1)) {
+  #print(user_connection_table_ip$Date[i])
+  #let`s calculate the delta by time
+    time.i <- user_connection_table_ip$Date[i] %>%
+      ymd_hms() 
+    time.i.next <- user_connection_table_ip$Date[i+1] %>%
+      ymd_hms() 
+   delta.t <- difftime(time.i.next, time.i, units="mins")
+   print(i)
+   print(delta.t)
+  }
   
+ # debug-zone-------- 
+  X1 <- user_connection_table_ip$Date[9] %>%
+    ymd_hms()
   
-  
+  X2 <- user_connection_table_ip$Date[10] %>%
+    ymd_hms()
     
+  XXX <- X2 - X1
+  XXX
+  Q <- difftime(X2,X1,units="mins")
+    
+  
+  X37 <- user_connection_table_ip$Date[37] %>%
+    ymd_hms()
+  
+  X38 <- user_connection_table_ip$Date[38] %>%
+    ymd_hms()
+  
+  Q <- difftime(X38,X37,units="mins")
+  as.numeric(Q)  
+  
