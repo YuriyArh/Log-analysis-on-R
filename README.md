@@ -8,5 +8,6 @@
 
 # Запуск
 - `$ git clone https://github.com/YuriyArh/Log-analysis-on-R.git`
+- `$ cd Log-analysis-on-R`
 - `$ python3 new_parser.py`
-Файл с расширением  .csv сохранится в той же директории
+- Файл с расширением  .csv сохранится в той же директории
