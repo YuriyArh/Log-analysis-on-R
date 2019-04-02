@@ -36,11 +36,13 @@ find_multiply_ip_for_login <- function(login, d_frame) {
  
  
   #--------------- read the file ------------------------------------
-  setwd('/root/WorkR/Log-analysis-on-R/PostfixLogs')
-  mail.dataset <- read.table('result.csv',  quote="\"", header = T, sep=";")
-  
+  setwd('/root/WorkR/Log-analysis-on-R/PostfixLogs')   
+  #---# nrows=100 --> DEBUG ITEM, MUST BE DELETED BEFORE DEPLOY!!!
+  mail.dataset <- read.table('result3.csv',  quote="\"", header = T, sep=";", nrows = 35000)                             
+                                                                                                                                                                                    
   # filter user connections
   user_connection_table <- filter(mail.dataset, Login != "N/A" ) %>%
+    filter(Login !="") %>%
     filter(Process == "connect")
   # get a list of unique logins
   unique_logins_table <- (unique(user_connection_table$Login)) %>%
@@ -49,10 +51,8 @@ find_multiply_ip_for_login <- function(login, d_frame) {
   # find multiply ip for login -----------------------
   # create empty dataframe
   mult_logins_user <- data.frame()
-  names(mult_logins_use)<-c("e_mail","number_of_ip")
-  N <- length(unique_logins_table$value) 
   # find e-mail addresses that have more than three IP
-  for (i in 1:N) {
+  for (i in 1:nrow(unique_logins_table)) {
     number_of_ip <- find_multiply_ip_for_login(unique_logins_table$value[i], user_connection_table)
     e_mail <- as.character(unique_logins_table$value[i])
     if (number_of_ip > 2){
@@ -66,9 +66,7 @@ find_multiply_ip_for_login <- function(login, d_frame) {
   table(mult_logins_user)  # static table of uniq ip
   # create data.frame for analysis
   user_connection_table_ip <- data.frame()
-  Q <- length(mult_logins_user$e_mail)
-  for (i in 1:Q) {
-    #print(  as.character(mult_logins_user$e_mail[i] ))
+  for (i in 1:nrow(mult_logins_user)) {
     user_connection_table_ip_temp <- filter(user_connection_table, Login == as.character(mult_logins_user$e_mail[i] ))
     user_connection_table_ip <- rbind( user_connection_table_ip, user_connection_table_ip_temp)
   }
@@ -77,6 +75,7 @@ find_multiply_ip_for_login <- function(login, d_frame) {
   
   user_connection_table_ip$Date <- as.character(user_connection_table_ip$Date) %>%
       strptime(format = '%Y %b %d %H:%M:%S', 'GMT') 
+      #arrange(Date) 
   #-----------------------------------------------------------------------
   # fix the time window and move it along the frame user_connection_table_ip 
   # inside each step we will check the connection from at least 
@@ -85,6 +84,9 @@ find_multiply_ip_for_login <- function(login, d_frame) {
   #-----------------------------------------------------------------------
   user_connection_table_final <- data.frame()
   #W <- length(user_connection_table_ip$Date)
+  
+  VVV <- order(user_connection_table_ip$Date)
+  
   W = 10
   for (i in 1:(W-1)) {
   #print(user_connection_table_ip$Date[i])
