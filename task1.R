@@ -9,6 +9,7 @@
 rm(list=ls())
 library(tidyr)
 library(dplyr)
+library(tibble)
 
 library(stringr)
 library(ggplot2)
@@ -26,111 +27,112 @@ library(tcltk2)
 #--------------------------------------------------------------
 
 find_multiply_ip_for_login <- function(login, d_frame) {
-  
+
   number_of_ip <- d_frame %>%
     filter(Login==login) %>%
     distinct(rip)%>%
     count()
   return(number_of_ip$n)
-  
+
 }
-########################################################################
- 
- 
-  #--------------- read the file ------------------------------------
-  setwd('/root/WorkR/Log-analysis-on-R/PostfixLogs')   
-  #---# nrows=100 --> DEBUG ITEM, MUST BE DELETED BEFORE DEPLOY!!!
-  mail.dataset <- read.table('result3.csv',  quote="\"", header = T, sep=";", nrows = 35000)                             
-                                                                                                                                                                                    
-  # filter user connections
-  user_connection_table <- filter(mail.dataset, Login != "N/A" ) %>%
-    filter(Login !="") %>%
-    filter(Process == "connect")
-  # get a list of unique logins
-  unique_logins_table <- (unique(user_connection_table$Login)) %>%
+#------------ find_unique_mail(d_frame)---------------
+# the function find list of unique e-mail login`s in dataframe d_frame
+# 
+# arg1   -> d_frame: postfix data frame -> data.frame
+# return -> unique.e_mail -> data.frame
+#--------------------------------------------------------------
+
+find_unique_e.mail <- function(d_frame) {
+
+  unique.e_mail <- (unique(d_frame$Login)) %>%
     as_tibble() %>%
-    arrange(value) 
-  # find multiply ip for login -----------------------
-  # create empty dataframe
-  mult_logins_user <- data.frame()
-  # find e-mail addresses that have more than three IP
- 
-   pb <- txtProgressBar(min = 1, max = nrow(unique_logins_table), style = 3) 
-  for (i in 1:nrow(unique_logins_table)) {
-    number_of_ip <- find_multiply_ip_for_login(unique_logins_table$value[i], user_connection_table)
-    e_mail <- as.character(unique_logins_table$value[i])
-    if (number_of_ip > 2){
-      #print(e_mail)
-      #print(number_of_ip)
-      setTxtProgressBar(pb, i)
-      # datatable with e-mail addresses and the number of unique ip addresses
-      mult_logins_user <- rbind( mult_logins_user, data.frame(e_mail, number_of_ip))
+    arrange(value)
+  return(unique.e_mail)
+
+}
+#---------------------------------------------------------------------
+########################################################################
+
+
+#--------------- read the file ------------------------------------
+setwd('/home/petr0vsk/WorkR/Log-analysis-on-R/PostfixLogs')   
+#---# nrows=35000 --> DEBUG ITEM, MUST BE DELETED BEFORE DEPLOY!!!
+#  login is true
+mail.dataset <- read.table('result3.csv',  quote="\"", header = T, sep=";")  %>%
+  filter(Process.condition == 'login' )
+# work with date -------
+# convert  user_connection_table_ip$Date to POSIXct format
+mail.dataset$Date <-ymd_hms(mail.dataset$Date)
+# and sort user_connection_table_ip by date-time
+mail.dataset  <-   arrange(mail.dataset, Date)
+
+#-----------------------------------------------------------------------
+# зафикируем временное окно и будем сдвигать его от начальной к конечной
+# точке по времени исходного датасета mail.dataset
+# размер окна определяется переменной window_size, размерность окна - минуты
+# найденный срез сохраняем во фрейм delta_time_mail.dataset для дальнейшего
+# анализа
+# от исходного датафрейма отрезаем срез и так до тех пор, пока длина исх.датафрейма != 0
+#-----------------------------------------------------------------------
+window_size = 5 # размер окна поиска 5 минут
+# подготовим  временный датафрейм в котором будем хранить срез за 5 минут
+delta_time_mail.dataset <- data.frame()
+# общий результирующий фрейм ля краткой информации: логин, количество IP
+short_final_table <- data.frame()
+#colnames(short_final_table, c("login", "quantity__ip", "delta_time", "time_begin", "time_end"))
+# общий результирующий фрейм для полной информации по нелигитмным подключениям
+long_final_table <- data.frame() 
+# ###########################################
+#browser()
+while( nrow(mail.dataset) > 0 )  { # пока длина исх.датафрейма больше нуля
+  for (i in 1: nrow(mail.dataset) ) {
+    if (i == nrow(mail.dataset)) { # окно меньше 5 минут, но дошли до  конца датафрейма? 
+      #print("(i == nrow(mail.dataset))")
+      mail.dataset <- data.frame() # обнулим остаток исх.датафрейма  для выхода из while(..)
+      break # выход из цикла по концу исходного датафрейма
     }
-  }
-  length(mult_logins_user$e_mail) # number of e-mail
-  table(mult_logins_user)  # static table of uniq ip
-  # create data.frame for analysis
-  pb <- txtProgressBar(min = 1, max = nrow(mult_logins_user), style = 3) 
-  user_connection_table_ip <- data.frame()
-  for (i in 1:nrow(mult_logins_user)) {
-    user_connection_table_ip_temp <- filter(user_connection_table, Login == as.character(mult_logins_user$e_mail[i] ))
-    user_connection_table_ip <- rbind( user_connection_table_ip, user_connection_table_ip_temp)
-    setTxtProgressBar(pb, i)
-  }
-  # work with date -------
-  # convert  user_connection_table_ip$Date to POSIXct format
-  user_connection_table_ip$Date <-ymd_hms(user_connection_table_ip$Date)
-  # and sort user_connection_table_ip by date-time
-  user_connection_table_ip  <-   arrange(user_connection_table_ip, Date)
-  
-  #-----------------------------------------------------------------------
-  # fix the time window and move it along the frame user_connection_table_ip 
-  # inside each step we will check the connection from at least 
-  # three unique ip-addresses, if the conditions are met, 
-  # we display the rows in the summary table  user_connection_table_final
-  #-----------------------------------------------------------------------
-  
- # debug-zone-------- 
-  start_time <- user_connection_table_ip$Date[1]
-  
-  user_connection_table_ip %>% 
-    filter(Date == start_time )
-  
-  
-  
-  X1 <- user_connection_table_ip$Date[9] %>%
-    ymd_hms()
-  
-  X2 <- user_connection_table_ip$Date[10] %>%
-    ymd_hms()
-    
-  XXX <- X2 - X1
-  XXX
-  Q <- difftime(X2,X1,units="mins")
-    
-  
-  X37 <- user_connection_table_ip$Date[37] %>%
-    ymd_hms()
-  
-  X38 <- user_connection_table_ip$Date[38] %>%
-    ymd_hms()
-  
-  Q <- difftime(X38,X37,units="mins")
-  as.numeric(Q)  
-  
-  
-  
-    ## Create Time Sequence -
-    x <- timeSequence(from = "2001-01-01", to = "2009-01-01", by = "day")
-    
-    ## Generate Periods -
-    periods(x, "2m", "1m")
-    periods(x, "52w", "4w")
-    
-    ## Roll Periodically -
-    periodicallyRolling(x)
-    
-    ## Roll Monthly -
-    monthlyRolling(x)
-   
-  
+    # проверим разницу по времени между первой записью и той на которую указывает в цикле i
+    delta_time <- (as.numeric( difftime(mail.dataset$Date[i],mail.dataset$Date[1],units="mins") ))
+      if (delta_time > window_size ) { # окно больше 5 минут?
+        #browser()
+        print( paste0("delta_time = ", delta_time)  )
+        delta_time_mail.dataset <- mail.dataset[1:(i-1),] # запомним срез для анализа
+        mail.dataset %>% # удалим выделенный срез из основого датафрейма
+          slice(-seq(1:(i-1))) -> mail.dataset
+        # найдем в срезе список уник. логинов для проверки с каких IP был коннект
+        unique_logins_table <- (unique(delta_time_mail.dataset$Login)) %>%
+          as.data.frame()
+        colnames(unique_logins_table) <- c("values")
+        # найдем  e-mail  адреса/логины, которые коннектились с трех и более IP
+        for (j in 1:nrow(unique_logins_table)) {
+          number_of_ip <- find_multiply_ip_for_login(unique_logins_table$value[j], delta_time_mail.dataset)#найдем кол-во IP, с которых были подключения
+          e_mail <- as.character(unique_logins_table$value[j])
+          if (number_of_ip >= 3 ){ # количество уникальных IP в срезе за 5 минут > 3?
+            # сохраним полную трассировку нелигитмных подключений за заданный период временни
+            #browser()
+            # подбробная информация
+            temp_long_final_table <- data.frame()
+            delta_time_mail.dataset %>%
+              filter(Login == as.character(e_mail)) %>%
+              bind_rows() -> temp_long_final_table
+            long_final_table <- rbind(long_final_table, temp_long_final_table) # финальная таблица с полной информацией
+            # краткая информация
+            mult_logins_user <- data.frame(first(temp_long_final_table$Login), number_of_ip, delta_time, first(temp_long_final_table$Date), last(temp_long_final_table$Date) )
+            short_final_table <- rbind(short_final_table, mult_logins_user) # финальная таблица с полной информацией
+          }
+        }
+       break # выход из цикла если окно меньше 5 минут
+       }#if (delta_time >.. 
+    }# for (i in 1:nrow(mail.dataset..
+}#while(nrow(mail.dataset.. 
+# запомним результаты в csv-файл
+colnames(short_final_table) <- c("login", "quantity__ip", "delta_time", "time_begin", "time_end")
+write.csv(long_final_table,  file="long_final_table.csv")
+write.csv(short_final_table, file="short_final_table.csv")
+
+
+
+
+
+
+
